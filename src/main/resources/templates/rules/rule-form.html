@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/default :: layout(~{::title}, ~{::section})}">
+<head>
+    <title th:text="${rule.ruleName} + ' - Gamification System'">Rule - Gamification System</title>
+</head>
+<body>
+<section>
+    <div class="container">
+        <h2 class="mb-4" th:text="${rule.ruleName} + ' Rule'">Rule</h2>
+
+        <div class="alert alert-info">
+            <p><strong>Rule Description:</strong> <span th:text="${rule.description}">Rule description</span></p>
+            <p th:if="${rule.outcomes[0].type == 'award'}">
+                <strong>Effect:</strong> +<span th:text="${rule.outcomes[0].points}">0</span> points to the
+                <span th:text="${rule.outcomes[0].target}">target</span>'s group.
+            </p>
+            <p th:if="${rule.outcomes[0].type == 'penalty'}">
+                <strong>Effect:</strong> <span th:text="${rule.outcomes[0].points}">0</span> points penalty to the
+                <span th:text="${rule.outcomes[0].target}">target</span>'s group.
+            </p>
+            <p th:if="${rule.cap != null}">
+                <strong>Cap:</strong> Maximum of <span th:text="${rule.cap.maxPoints}">0</span> points per group.
+            </p>
+        </div>
+
+        <!-- Success message -->
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <span th:text="${success}">Success message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <div class="card">
+            <div class="card-header"
+                 th:classappend="${rule.outcomes[0].type == 'award' ? 'bg-success' : 'bg-danger'} + ' text-white'">
+                <h5 class="card-title mb-0" th:text="'Execute ' + ${rule.ruleName}">Execute Rule</h5>
+            </div>
+            <div class="card-body">
+                <!-- Form for SAP Hours (multiple selection) -->
+                <form th:if="${rule.ruleName == 'SAP Hours'}"
+                      th:action="@{'/rules/execute/' + ${rule.conditions[0].value}}" method="post" id="offender-form">
+                    <div class="mb-3">
+                        <label class="form-label">Select Offenders:</label>
+                        <div class="row">
+                            <div class="col-md-4 mb-2" th:each="person : ${persons}">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="participantIds"
+                                           th:value="${person.id}" th:id="'person-' + ${person.id}">
+                                    <label class="form-check-label" th:for="'person-' + ${person.id}">
+                                        <span th:text="${person.name}">Person Name</span>
+                                        <small class="text-muted" th:text="'(Group: ' + ${person.group.name} + ')'">Group</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" name="targetRole" th:value="${rule.outcomes[0].target}">
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-danger">Apply Penalty</button>
+                    </div>
+                </form>
+
+                <!-- Form for all other rules (single selection) -->
+                <form th:unless="${rule.ruleName == 'SAP Hours'}"
+                      th:action="@{'/rules/execute/' + ${rule.conditions[0].value}}" method="post" id="standard-form">
+                    <div class="mb-3">
+                        <label for="participantId" class="form-label"
+                               th:text="'Select ' + ${rule.outcomes[0].target} + ':'">Select Person:</label>
+                        <select class="form-select" id="participantId" name="participantId" required>
+                            <option value="" selected disabled>-- Select a person --</option>
+                            <option th:each="person : ${persons}"
+                                    th:value="${person.id}"
+                                    th:text="${person.name} + ' (Group: ' + ${person.group.name} + ')'">
+                                Person Name (Group)
+                            </option>
+                        </select>
+                    </div>
+                    <input type="hidden" name="targetRole" th:value="${rule.outcomes[0].target}">
+
+                    <!-- Additional fields for Win Team Game -->
+                    <div th:if="${rule.ruleName == 'Win Team Game'}">
+                        <div class="mb-3">
+                            <label for="gameType" class="form-label">Game Type:</label>
+                            <select class="form-select" id="gameType" name="gameType">
+                                <option value="Team Building">Team Building</option>
+                                <option value="Problem Solving">Problem Solving</option>
+                                <option value="Coding Competition">Coding Competition</option>
+                                <option value="Design Challenge">Design Challenge</option>
+                                <option value="Quiz Competition">Quiz Competition</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="gameName" class="form-label">Game Name (Optional):</label>
+                            <input type="text" class="form-control" id="gameName" name="gameName"
+                                   placeholder="Enter game name">
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn"
+                                th:classappend="${rule.outcomes[0].type == 'award' ? 'btn-success' : 'btn-danger'}"
+                                th:text="${rule.outcomes[0].type == 'award' ? 'Award Points' : 'Apply Penalty'}">
+                            Submit
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h4>How it works</h4>
+            <ol th:if="${rule.ruleName == 'SAP Hours'}">
+                <li>Select one or more persons who failed to log their SAP hours.</li>
+                <li>Click "Apply Penalty" to execute the rule.</li>
+                <li>Each offender's group will receive a -2 point penalty.</li>
+                <li>All other members of the group who are not offenders will be rewarded with +1 point each (subject to
+                    a cap of 2 points per group).
+                </li>
+            </ol>
+            <ol th:unless="${rule.ruleName == 'SAP Hours'}">
+                <li th:text="'Select a person who is the ' + ${rule.outcomes[0].target} + '.'">Select a person.</li>
+                <li th:if="${rule.ruleName == 'Win Team Game'}">Select the type of game that was played.</li>
+                <li th:if="${rule.ruleName == 'Win Team Game'}">Optionally, enter the name of the game for
+                    record-keeping.
+                </li>
+                <li th:text="'Click &quot;' + (${rule.outcomes[0].type == 'award'} ? 'Award Points' : 'Apply Penalty') + '&quot; to execute the rule.'">
+                    Click the button to execute the rule.
+                </li>
+                <li th:text="'The selected person\'s group will receive ' + (${rule.outcomes[0].type == 'award'} ? '+' : '') + ${rule.outcomes[0].points} + ' points.'">
+                    Points will be awarded or deducted.
+                </li>
+                <li th:text="'The person will be recorded as a ' + ${rule.outcomes[0].target} + ' in the system.'">The
+                    action will be recorded.
+                </li>
+            </ol>
+        </div>
+
+        <!-- Additional information for Win Team Game -->
+        <div th:if="${rule.ruleName == 'Win Team Game'}" class="mt-4 alert alert-light border">
+            <h5>Benefits of Team Games</h5>
+            <ul>
+                <li>Builds team spirit and camaraderie</li>
+                <li>Improves communication and collaboration</li>
+                <li>Develops problem-solving skills</li>
+                <li>Encourages healthy competition</li>
+                <li>Boosts morale and motivation</li>
+                <li>Provides a fun break from routine work</li>
+            </ul>
+        </div>
+    </div>
+</section>
+</body>
+</html>

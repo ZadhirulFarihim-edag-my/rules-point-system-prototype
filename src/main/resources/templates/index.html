@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/default :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>Home - Gamification System</title>
+</head>
+<body>
+<section>
+    <div class="container">
+        <div class="jumbotron bg-light p-5 rounded">
+            <h1 class="display-4">Welcome to the Gamification System</h1>
+            <p class="lead">A point system prototype for tracking and rewarding team activities.</p>
+            <hr class="my-4">
+            <p>Use this system to manage persons, groups, and execute rules to award or penalize points.</p>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">Persons</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">View and manage all persons in the system. Track individual contributions
+                            and point history.</p>
+                        <a href="/persons" class="btn btn-primary">Manage Persons</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">Groups</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">View and manage all groups in the system. Track group points and activity
+                            history.</p>
+                        <a href="/groups" class="btn btn-success">Manage Groups</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="card-title mb-0">Rules</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">Execute rules to award or penalize points based on various activities.</p>
+                        <a href="/rules" class="btn btn-info">Execute Rules</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+</body>
+</html>

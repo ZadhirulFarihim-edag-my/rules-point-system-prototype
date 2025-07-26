@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/default :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>Rules - Gamification System</title>
+</head>
+<body>
+<section>
+    <div class="container">
+        <h2 class="mb-4">Available Rules</h2>
+
+        <div class="alert alert-info">
+            <p>Select a rule to execute from the list below. Each rule has different effects on points for persons and
+                groups.</p>
+        </div>
+
+        <div class="row">
+            <!-- Dynamically generate cards for each rule -->
+            <div th:each="rule : ${rules}" class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header"
+                         th:classappend="${rule.outcomes[0].type == 'award' ? 'bg-success' : 'bg-danger'} + ' text-white'">
+                        <h5 class="card-title mb-0" th:text="${rule.ruleName}">Rule Name</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text" th:text="${rule.description}">Rule description</p>
+                        <p>
+                            <strong>Effect:</strong>
+                            <span th:if="${rule.outcomes[0].type == 'award'}">
+                                    +<span th:text="${rule.outcomes[0].points}">0</span> points to the 
+                                    <span th:text="${rule.outcomes[0].target}">target</span>'s group.
+                                </span>
+                            <span th:if="${rule.outcomes[0].type == 'penalty'}">
+                                    <span th:text="${rule.outcomes[0].points}">0</span> points penalty to the 
+                                    <span th:text="${rule.outcomes[0].target}">target</span>'s group.
+                                </span>
+                        </p>
+                        <a th:href="@{'/rules/' + ${rule.ruleName.replace(' ', '-').toLowerCase()}}"
+                           class="btn"
+                           th:classappend="${rule.outcomes[0].type == 'award' ? 'btn-outline-success' : 'btn-outline-danger'}">
+                            Execute Rule
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h4>Rules Overview</h4>
+            <p>The gamification system uses rules to award or penalize points based on various activities. Each rule has
+                different effects and may be subject to caps or other limitations.</p>
+            <p>When a rule is executed, points are awarded or deducted from the relevant person's group, and the
+                person's contribution is recorded in the system.</p>
+            <p>Some rules, like the SAP Hours rule, have weekly caps that reset automatically after 7 days.</p>
+        </div>
+    </div>
+</section>
+</body>
+</html>

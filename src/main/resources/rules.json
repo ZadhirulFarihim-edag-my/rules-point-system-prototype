@@ -1,0 +1,91 @@
+[
+  {
+    "ruleName": "SAP Hours",
+    "description": "Manages rewards and penalties related to SAP hours logging.",
+    "active": true,
+    "groupBasedActivity": true,
+    "conditions": [
+      {
+        "type": "action",
+        "value": "did_not_key_in_sap_hour"
+      }
+    ],
+    "outcomes": [
+      {
+        "type": "penalty",
+        "points": -2,
+        "target": "offender",
+        "reason": "SAP Hours Offender in Group"
+      },
+      {
+        "type": "award",
+        "points": 1,
+        "target": "compliant",
+        "reason": "All Group Members SAP Hours Compliant"
+      }
+    ],
+    "cap": {
+      "maxPoints": 2
+    }
+  },
+  {
+    "ruleName": "Forum Participant",
+    "description": "Award points for forum participation.",
+    "active": true,
+    "groupBasedActivity": true,
+    "conditions": [
+      {
+        "type": "action",
+        "value": "forum_participation"
+      }
+    ],
+    "outcomes": [
+      {
+        "type": "award",
+        "points": 1,
+        "target": "contributor",
+        "reason": "Forum Participant"
+      }
+    ]
+  },
+  {
+    "ruleName": "Join Hackathon",
+    "description": "Award points for joining a hackathon.",
+    "active": true,
+    "groupBasedActivity": true,
+    "conditions": [
+      {
+        "type": "action",
+        "value": "join_hackathon"
+      }
+    ],
+    "outcomes": [
+      {
+        "type": "award",
+        "points": 5,
+        "target": "participant",
+        "reason": "Joined Hackathon"
+      }
+    ]
+  },
+  {
+    "ruleName": "Win Team Game",
+    "description": "Big point award for winning a team game.",
+    "active": true,
+    "groupBasedActivity": true,
+    "conditions": [
+      {
+        "type": "action",
+        "value": "win_team_game"
+      }
+    ],
+    "outcomes": [
+      {
+        "type": "award",
+        "points": 10,
+        "target": "winner",
+        "reason": "Won Team Game"
+      }
+    ]
+  }
+]
