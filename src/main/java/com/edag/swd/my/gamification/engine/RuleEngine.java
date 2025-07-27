@@ -2,25 +2,31 @@ package com.edag.swd.my.gamification.engine;
 
 import com.edag.swd.my.gamification.config.OutcomeConfig;
 import com.edag.swd.my.gamification.config.RuleConfig;
-import com.edag.swd.my.gamification.models.Event;
-import com.edag.swd.my.gamification.models.Group;
-import com.edag.swd.my.gamification.models.Person;
+import com.edag.swd.my.gamification.entity.Group;
+import com.edag.swd.my.gamification.entity.Person;
+import com.edag.swd.my.gamification.repository.GroupRepository;
+import com.edag.swd.my.gamification.repository.PersonRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
+/**
+ * EntityRuleEngine is a version of RuleEngine that works with entity classes and repositories
+ * instead of model classes and in-memory collections.
+ */
 @Service
 public class RuleEngine {
     private final Map<String, RuleConfig> rules = new ConcurrentHashMap<>();
-    private final Map<String, Person> persons = new ConcurrentHashMap<>();
-    private final Map<String, Group> groups = new ConcurrentHashMap<>();
+    private final PersonRepository personRepository;
+    private final GroupRepository groupRepository;
 
     // Map to track the last reset time for each group's "sap_hours_compliant" rule
     // Key format: groupId + "_" + ruleName
@@ -29,6 +35,36 @@ public class RuleEngine {
     // The rule name that should have weekly reset
     private static final String WEEKLY_RESET_RULE = "SAP Hours";
 
+    // Path to the rules.json file
+    private static final String RULES_JSON_PATH = "/rules.json";
+
+    @Autowired
+    public RuleEngine(PersonRepository personRepository, GroupRepository groupRepository) {
+        this.personRepository = personRepository;
+        this.groupRepository = groupRepository;
+    }
+
+    /**
+     * Ensures that rules are loaded before processing any rule-related request.
+     * If rules are not loaded, loads them from rules.json.
+     */
+    private void ensureRulesLoaded() {
+        if (rules.isEmpty()) {
+            try {
+                loadRules(RULES_JSON_PATH);
+            } catch (Exception e) {
+                System.err.println("Error loading rules: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Loads rules from a JSON file.
+     *
+     * @param resourcePath Path to the JSON file containing rules
+     * @throws Exception If there's an error loading the rules
+     */
     public void loadRules(String resourcePath) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         try (InputStream inputStream = TypeReference.class.getResourceAsStream(resourcePath)) {
@@ -38,253 +74,403 @@ public class RuleEngine {
             List<RuleConfig> ruleList = mapper.readValue(inputStream, new TypeReference<>() {
             });
             ruleList.forEach(rule -> this.rules.put(rule.getRuleName(), rule));
-            System.out.println("Loaded " + ruleList.size() + " rules.");
+            System.out.println("✅ Loaded " + ruleList.size() + " rules.");
         }
     }
 
-    public void addPerson(Person person) {
-        this.persons.put(person.getId(), person);
-        if (this.groups.containsKey(person.getGroupId())) {
-            this.groups.get(person.getGroupId()).addMember(person);
-        }
-    }
+    /**
+     * Processes an event with the given action type and participants.
+     *
+     * @param actionType   The type of action to process
+     * @param participants Map of participant roles to person IDs
+     */
+    @Transactional
+    public void processEvent(String actionType, Map<String, String> participants) {
+        // Ensure rules are loaded before processing the event
+        ensureRulesLoaded();
 
-    public void addGroup(Group group) {
-        this.groups.put(group.getId(), group);
-    }
+        System.out.println("\n-> Processing event: " + actionType);
 
-    public void processEvent(Event event) {
-        System.out.println("\n-> Processing event: " + event.getActionType());
-
-        // Special case for "did_not_key_in_sap_hour" event
-        if ("did_not_key_in_sap_hour".equalsIgnoreCase(event.getActionType())) {
-            processSapHoursEvent(event);
-        } else {
-            // Normal processing for other events
-            this.rules.values().stream()
-                    .filter(RuleConfig::isActive)
-                    .filter(rule -> matches(rule, event))
-                    .forEach(rule -> applyOutcomes(rule, event));
-        }
-    }
-
-    private void processSapHoursEvent(Event event) {
-        System.out.println("   - SPECIAL PROCESSING: Merged processing for SAP Hours");
-
-        // Get the list of offenders from the event
-        List<String> offenderIds = new ArrayList<>();
-        Map<String, String> participants = event.getParticipants();
-
-        for (Map.Entry<String, String> entry : participants.entrySet()) {
-            if ("offender".equals(entry.getKey())) {
-                String personId = entry.getValue();
-                offenderIds.add(personId);
-
-                // Apply penalty to offender's group
-                Person offender = persons.get(personId);
-                if (offender != null) {
-                    Group group = groups.get(offender.getGroupId());
-                    if (group != null) {
-                        // Record the individual's contribution
-                        offender.recordContribution(-2, "SAP Hours Offender in Group", WEEKLY_RESET_RULE);
-                        System.out.printf("   - AUDIT: Recorded -2 points for %s due to '%s'.\n",
-                                offender.getName(), WEEKLY_RESET_RULE);
-
-                        // Update the group's total score
-                        group.addPoints(-2, "SAP Hours Offender in Group", WEEKLY_RESET_RULE);
-                        System.out.printf("   - ACTION: Group '%s' score changed by -2. New Total: %d.\n",
-                                group.getName(), group.getTotalGroupPoints());
+        // Process all matching rules
+        this.rules.values().stream()
+                .filter(RuleConfig::isActive)
+                .filter(rule -> matches(rule, actionType))
+                .forEach(rule -> {
+                    // Check if the rule has multiple outcome types (both award and penalty)
+                    if (hasMultipleOutcomeTypes(rule)) {
+                        // Use the generic method for rules with multiple outcome types
+                        processMultiOutcomeRule(rule, participants);
+                    } else {
+                        // Use the standard method for rules with a single outcome type
+                        applyOutcomes(rule, participants);
                     }
+                });
+    }
+
+    /**
+     * Checks if a rule has multiple outcome types (both award and penalty).
+     *
+     * @param rule The rule to check
+     * @return true if the rule has both award and penalty outcomes, false otherwise
+     */
+    private boolean hasMultipleOutcomeTypes(RuleConfig rule) {
+        boolean hasAward = false;
+        boolean hasPenalty = false;
+
+        for (OutcomeConfig outcome : rule.getOutcomes()) {
+            if ("award".equalsIgnoreCase(outcome.getType())) {
+                hasAward = true;
+            } else if ("penalty".equalsIgnoreCase(outcome.getType())) {
+                hasPenalty = true;
+            }
+
+            // If we've found both types, we can return early
+            if (hasAward && hasPenalty) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Processes a rule with multiple outcome types (both award and penalty).
+     * This is a generic implementation that can handle any rule with multiple outcome types,
+     * not just the SAP Hours rule.
+     *
+     * @param rule         The rule to process
+     * @param participants Map of participant roles to person IDs
+     */
+    @Transactional
+    private void processMultiOutcomeRule(RuleConfig rule, Map<String, String> participants) {
+        System.out.println("   - SPECIAL PROCESSING: Generic processing for rule with multiple outcome types: " + rule.getRuleName());
+
+        // Get all penalty targets from the rule's outcomes
+        List<String> penaltyTargets = rule.getOutcomes().stream()
+                .filter(outcome -> "penalty".equalsIgnoreCase(outcome.getType()))
+                .map(OutcomeConfig::getTarget)
+                .distinct()
+                .toList();
+
+        // Get all award targets from the rule's outcomes
+        List<String> awardTargets = rule.getOutcomes().stream()
+                .filter(outcome -> "award".equalsIgnoreCase(outcome.getType()))
+                .map(OutcomeConfig::getTarget)
+                .distinct()
+                .toList();
+
+        // Process penalties first
+        List<String> penalizedPersonIds = new ArrayList<>();
+
+        // Apply penalties to all penalty targets
+        for (String penaltyTarget : penaltyTargets) {
+            // Get all persons with this target role
+            for (Map.Entry<String, String> entry : participants.entrySet()) {
+                if (penaltyTarget.equals(entry.getKey())) {
+                    String personId = entry.getValue();
+                    penalizedPersonIds.add(personId);
+
+                    // Find the penalty outcome for this target
+                    OutcomeConfig penaltyOutcome = rule.getOutcomes().stream()
+                            .filter(outcome -> "penalty".equalsIgnoreCase(outcome.getType()) &&
+                                    penaltyTarget.equals(outcome.getTarget()))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (penaltyOutcome == null) continue;
+
+                    // Apply penalty to the person and their group
+                    Optional<Person> optionalPerson = personRepository.findById(personId);
+                    if (optionalPerson.isEmpty()) continue;
+
+                    Person person = optionalPerson.get();
+                    String groupId = person.getGroupId();
+                    Optional<Group> optionalGroup = groupRepository.findById(groupId);
+                    if (optionalGroup.isEmpty()) continue;
+
+                    Group group = optionalGroup.get();
+
+                    // Record the individual's contribution
+                    person.recordContribution(penaltyOutcome.getPoints(), penaltyOutcome.getReason(), rule.getRuleName());
+                    personRepository.save(person);
+                    System.out.printf("   - AUDIT: Recorded %+d points for %s due to '%s'.\n",
+                            penaltyOutcome.getPoints(), person.getName(), rule.getRuleName());
+
+                    // Update the group's total score
+                    group.addPoints(penaltyOutcome.getPoints(), penaltyOutcome.getReason(), rule.getRuleName());
+                    groupRepository.save(group);
+                    System.out.printf("   - ACTION: Group '%s' score changed by %+d. New Total: %d.\n",
+                            group.getName(), penaltyOutcome.getPoints(), group.getTotalGroupPoints());
                 }
             }
         }
 
-        // Process each group to find non-offenders and reward them
-        for (Group group : groups.values()) {
-            // Get all members of the group who are not offenders
-            List<Person> nonOffenders = new ArrayList<>();
+        // Process awards for all groups
+        List<Group> allGroups = groupRepository.findAll();
+        for (Group group : allGroups) {
+            // For each award target, find all eligible persons in the group
+            for (String awardTarget : awardTargets) {
+                List<Person> groupMembers = personRepository.findByGroupId(group.getId());
+                List<Person> eligiblePersons;
 
-            // Manually filter to find non-offenders
-            for (Person person : persons.values()) {
-                if (person.getGroupId().equals(group.getId()) && !offenderIds.contains(person.getId())) {
-                    nonOffenders.add(person);
+                // Special handling for "compliant" target
+                if ("compliant".equals(awardTarget)) {
+                    // Check if there are specific compliant participants in the participants map
+                    boolean hasSpecificCompliantParticipants = participants.entrySet().stream()
+                            .anyMatch(entry -> "compliant".equals(entry.getKey()));
+
+                    if (hasSpecificCompliantParticipants) {
+                        // Use the specified compliant participants
+                        eligiblePersons = new ArrayList<>();
+                        for (Map.Entry<String, String> entry : participants.entrySet()) {
+                            if ("compliant".equals(entry.getKey())) {
+                                String personId = entry.getValue();
+                                Optional<Person> optionalPerson = personRepository.findById(personId);
+                                if (optionalPerson.isPresent() &&
+                                        group.getId().equals(optionalPerson.get().getGroupId())) {
+                                    eligiblePersons.add(optionalPerson.get());
+                                }
+                            }
+                        }
+                        System.out.println("   - SPECIAL HANDLING: Using specified compliant participants for rule: " + rule.getRuleName());
+                    } else {
+                        // Default behavior: all persons who are not in the penalized list
+                        eligiblePersons = groupMembers.stream()
+                                .filter(person -> !penalizedPersonIds.contains(person.getId()))
+                                .toList();
+                        System.out.println("   - DEFAULT HANDLING: Using all non-penalized persons as compliant for rule: " + rule.getRuleName());
+                    }
+                } else {
+                    // For other targets, check if they are in the participants map
+                    eligiblePersons = new ArrayList<>();
+                    for (Map.Entry<String, String> entry : participants.entrySet()) {
+                        if (awardTarget.equals(entry.getKey())) {
+                            String personId = entry.getValue();
+                            Optional<Person> optionalPerson = personRepository.findById(personId);
+                            if (optionalPerson.isPresent() &&
+                                    group.getId().equals(optionalPerson.get().getGroupId())) {
+                                eligiblePersons.add(optionalPerson.get());
+                            }
+                        }
+                    }
                 }
-            }
 
-            if (!nonOffenders.isEmpty()) {
-                System.out.printf("   - REWARD: Found %d non-offenders in group '%s'\n",
-                        nonOffenders.size(), group.getName());
+                if (eligiblePersons.isEmpty()) continue;
 
-                // Get the rule for "SAP Hours Compliant"
-                RuleConfig sapCompliantRule = this.rules.get(WEEKLY_RESET_RULE);
-                if (sapCompliantRule != null && sapCompliantRule.getCap() != null) {
-                    // Check if this is the rule that should have weekly reset
-                    String resetKey = group.getId() + "_" + WEEKLY_RESET_RULE;
-                    Instant now = Instant.now();
-                    Instant lastResetTime = lastResetTimeMap.getOrDefault(resetKey, Instant.EPOCH);
+                System.out.printf("   - REWARD: Found %d eligible persons for target '%s' in group '%s'\n",
+                        eligiblePersons.size(), awardTarget, group.getName());
 
-                    // Check if a week (7 days) has passed since the last reset
-                    if (Duration.between(lastResetTime, now).toDays() >= 7) {
-                        // Reset the cap for this rule
-                        group.resetActivityCap(WEEKLY_RESET_RULE);
-                        System.out.printf("   - WEEKLY RESET: Resetting cap for rule '%s' for group '%s' as a week has passed.\n",
-                                WEEKLY_RESET_RULE, group.getName());
+                // Find the award outcome for this target
+                OutcomeConfig awardOutcome = rule.getOutcomes().stream()
+                        .filter(outcome -> "award".equalsIgnoreCase(outcome.getType()) &&
+                                awardTarget.equals(outcome.getTarget()))
+                        .findFirst()
+                        .orElse(null);
 
-                        // Update the last reset time
-                        lastResetTimeMap.put(resetKey, now);
+                if (awardOutcome == null) continue;
+
+                // Apply capping logic if the rule has a cap
+                if (rule.getCap() != null) {
+                    // Check if this rule needs a weekly reset
+                    if (WEEKLY_RESET_RULE.equals(rule.getRuleName())) {
+                        String resetKey = group.getId() + "_" + rule.getRuleName();
+                        Instant now = Instant.now();
+                        Instant lastResetTime = lastResetTimeMap.getOrDefault(resetKey, Instant.EPOCH);
+
+                        // Check if a week (7 days) has passed since the last reset
+                        if (Duration.between(lastResetTime, now).toDays() >= 7) {
+                            // Reset the cap for this rule
+                            group.resetActivityCap(rule.getRuleName());
+                            System.out.printf("   - WEEKLY RESET: Resetting cap for rule '%s' for group '%s' as a week has passed.\n",
+                                    rule.getRuleName(), group.getName());
+
+                            // Update the last reset time
+                            lastResetTimeMap.put(resetKey, now);
+                        }
                     }
 
-                    // Apply capping logic
-                    int maxPoints = sapCompliantRule.getCap().getMaxPoints();
-                    int currentPointsForActivity = group.getCurrentActivityPoints().getOrDefault(WEEKLY_RESET_RULE, 0);
+                    int maxPoints = rule.getCap().getMaxPoints();
+                    int currentPointsForActivity = group.getCurrentPointsForActivity(rule.getRuleName());
 
-                    // Calculate how many points to award (1 point per non-offender, up to the cap)
-                    int pointsToAward = nonOffenders.size();
+                    // Calculate how many points to award (1 point per eligible person, up to the cap)
+                    int pointsToAward = eligiblePersons.size() * awardOutcome.getPoints();
 
                     if (currentPointsForActivity >= maxPoints) {
                         pointsToAward = 0; // Cap already reached, no more points for the group
+                        System.out.printf("   - CAPPING: Rule '%s' has a cap of %d. Group already has %d. No points awarded.\n",
+                                rule.getRuleName(), maxPoints, currentPointsForActivity);
+                        continue;
                     } else if (currentPointsForActivity + pointsToAward > maxPoints) {
                         pointsToAward = maxPoints - currentPointsForActivity; // Award partial points to hit the cap
+                        System.out.printf("   - CAPPING: Rule '%s' has a cap of %d. Group already has %d. Awarding %d points (partial).\n",
+                                rule.getRuleName(), maxPoints, currentPointsForActivity, pointsToAward);
+                    } else {
+                        System.out.printf("   - CAPPING: Rule '%s' has a cap of %d. Group already has %d. Awarding %d points.\n",
+                                rule.getRuleName(), maxPoints, currentPointsForActivity, pointsToAward);
                     }
 
                     // Update the group's tracking for this capped activity
-                    group.getCurrentActivityPoints().put(WEEKLY_RESET_RULE, currentPointsForActivity + pointsToAward);
-                    System.out.printf("   - CAPPING: Rule '%s' has a cap of %d. Group already has %d. Awarding %d points.\n",
-                            WEEKLY_RESET_RULE, maxPoints, currentPointsForActivity, pointsToAward);
+                    group.updateActivityPoints(rule.getRuleName(), currentPointsForActivity + pointsToAward);
 
-                    // Record contributions for each non-offender
-                    for (Person nonOffender : nonOffenders) {
-                        nonOffender.recordContribution(1, "All Group Members SAP Hours Compliant", WEEKLY_RESET_RULE);
-                        System.out.printf("   - AUDIT: Recorded +1 point for %s due to '%s'.\n",
-                                nonOffender.getName(), WEEKLY_RESET_RULE);
+                    // Record contributions for each eligible person
+                    for (Person eligiblePerson : eligiblePersons) {
+                        eligiblePerson.recordContribution(awardOutcome.getPoints(), awardOutcome.getReason(), rule.getRuleName());
+                        personRepository.save(eligiblePerson);
+                        System.out.printf("   - AUDIT: Recorded %+d point for %s due to '%s'.\n",
+                                awardOutcome.getPoints(), eligiblePerson.getName(), rule.getRuleName());
                     }
 
                     // Update the group's total score
                     if (pointsToAward > 0) {
-                        group.addPoints(pointsToAward, "All Group Members SAP Hours Compliant", WEEKLY_RESET_RULE);
-                        System.out.printf("   - ACTION: Group '%s' score changed by +%d. New Total: %d.\n",
+                        group.addPoints(pointsToAward, awardOutcome.getReason(), rule.getRuleName());
+                        groupRepository.save(group);
+                        System.out.printf("   - ACTION: Group '%s' score changed by %+d. New Total: %d.\n",
                                 group.getName(), pointsToAward, group.getTotalGroupPoints());
                     } else {
                         System.out.println("   - ACTION: No points awarded to group due to cap.");
                     }
+                } else {
+                    // For uncapped awards, simply add the points for each eligible person
+                    int totalPoints = eligiblePersons.size() * awardOutcome.getPoints();
+
+                    // Record contributions for each eligible person
+                    for (Person eligiblePerson : eligiblePersons) {
+                        eligiblePerson.recordContribution(awardOutcome.getPoints(), awardOutcome.getReason(), rule.getRuleName());
+                        personRepository.save(eligiblePerson);
+                        System.out.printf("   - AUDIT: Recorded %+d point for %s due to '%s'.\n",
+                                awardOutcome.getPoints(), eligiblePerson.getName(), rule.getRuleName());
+                    }
+
+                    // Update the group's total score
+                    group.addPoints(totalPoints, awardOutcome.getReason(), rule.getRuleName());
+                    groupRepository.save(group);
+                    System.out.printf("   - ACTION: Group '%s' score changed by %+d. New Total: %d.\n",
+                            group.getName(), totalPoints, group.getTotalGroupPoints());
                 }
             }
         }
     }
 
-    private boolean matches(RuleConfig rule, Event event) {
+    /**
+     * Checks if a rule matches the given action type.
+     *
+     * @param rule       The rule to check
+     * @param actionType The action type to match
+     * @return true if the rule matches the action type, false otherwise
+     */
+    private boolean matches(RuleConfig rule, String actionType) {
         return rule.getConditions().stream().allMatch(condition ->
                 "action".equalsIgnoreCase(condition.getType()) &&
-                        event.getActionType().equalsIgnoreCase(condition.getValue())
+                        actionType.equalsIgnoreCase(condition.getValue())
         );
     }
 
-    private void applyOutcomes(RuleConfig rule, Event event) {
+    /**
+     * Applies the outcomes of a rule to the participants.
+     *
+     * @param rule         The rule to apply
+     * @param participants Map of participant roles to person IDs
+     */
+    @Transactional
+    private void applyOutcomes(RuleConfig rule, Map<String, String> participants) {
         for (OutcomeConfig outcome : rule.getOutcomes()) {
-            String personId = event.getParticipants().get(outcome.getTarget());
+            String personId = participants.get(outcome.getTarget());
             if (personId == null) continue;
 
-            Person person = persons.get(personId);
-            if (person == null) continue;
+            Optional<Person> optionalPerson = personRepository.findById(personId);
+            if (optionalPerson.isEmpty()) continue;
 
-            Group group = groups.get(person.getGroupId());
-            if (group == null) continue;
+            Person person = optionalPerson.get();
+            String groupId = person.getGroupId();
+            Optional<Group> optionalGroup = groupRepository.findById(groupId);
+            if (optionalGroup.isEmpty()) continue;
 
-            // Always record the individual's contribution with the original point value for auditing
+            Group group = optionalGroup.get();
+
+            // Record the individual's contribution
             person.recordContribution(outcome.getPoints(), outcome.getReason(), rule.getRuleName());
-            System.out.printf("   - AUDIT: Recorded %d points for %s due to '%s'.\n",
+            personRepository.save(person);
+            System.out.printf("   - AUDIT: Recorded %+d points for %s due to '%s'.\n",
                     outcome.getPoints(), person.getName(), rule.getRuleName());
 
-            int pointsForGroup = outcome.getPoints();
+            // Check if this is an award outcome
+            if ("award".equalsIgnoreCase(outcome.getType())) {
+                // Apply capping logic if the rule has a cap
+                if (rule.getCap() != null) {
+                    // Check if this is the rule that should have weekly reset
+                    if (WEEKLY_RESET_RULE.equals(rule.getRuleName())) {
+                        String resetKey = groupId + "_" + rule.getRuleName();
+                        Instant now = Instant.now();
+                        Instant lastResetTime = lastResetTimeMap.getOrDefault(resetKey, Instant.EPOCH);
 
-            // Apply capping logic ONLY for awards, not penalties
-            if ("award".equalsIgnoreCase(outcome.getType()) && rule.getCap() != null) {
-                // Check if this is the rule that should have weekly reset
-                if (WEEKLY_RESET_RULE.equals(rule.getRuleName())) {
-                    String resetKey = group.getId() + "_" + rule.getRuleName();
-                    Instant now = Instant.now();
-                    Instant lastResetTime = lastResetTimeMap.getOrDefault(resetKey, Instant.EPOCH);
+                        // Check if a week (7 days) has passed since the last reset
+                        if (Duration.between(lastResetTime, now).toDays() >= 7) {
+                            // Reset the cap for this rule
+                            group.resetActivityCap(rule.getRuleName());
+                            System.out.printf("   - WEEKLY RESET: Resetting cap for rule '%s' for group '%s' as a week has passed.\n",
+                                    rule.getRuleName(), group.getName());
 
-                    // Check if a week (7 days) has passed since the last reset
-                    if (Duration.between(lastResetTime, now).toDays() >= 7) {
-                        // Reset the cap for this rule
-                        group.resetActivityCap(rule.getRuleName());
-                        System.out.printf("   - WEEKLY RESET: Resetting cap for rule '%s' for group '%s' as a week has passed.\n",
-                                rule.getRuleName(), group.getName());
-
-                        // Update the last reset time
-                        lastResetTimeMap.put(resetKey, now);
-                    }
-                }
-
-                int maxPoints = rule.getCap().getMaxPoints();
-                int currentPointsForActivity = group.getCurrentActivityPoints().getOrDefault(rule.getRuleName(), 0);
-
-                if (currentPointsForActivity >= maxPoints) {
-                    pointsForGroup = 0; // Cap already reached, no more points for the group
-                } else if (currentPointsForActivity + pointsForGroup > maxPoints) {
-                    pointsForGroup = maxPoints - currentPointsForActivity; // Award partial points to hit the cap
-                }
-
-                // Update the group's tracking for this capped activity
-                group.getCurrentActivityPoints().put(rule.getRuleName(), currentPointsForActivity + pointsForGroup);
-                System.out.printf("   - CAPPING: Rule '%s' has a cap of %d. Group already has %d. Awarding %d points.\n",
-                        rule.getRuleName(), maxPoints, currentPointsForActivity, pointsForGroup);
-            }
-
-            // Update the group's total score
-            group.addPoints(pointsForGroup, outcome.getReason(), rule.getRuleName());
-            if (pointsForGroup != 0) {
-                System.out.printf("   - ACTION: Group '%s' score changed by %d. New Total: %d.\n",
-                        group.getName(), pointsForGroup, group.getTotalGroupPoints());
-            } else {
-                System.out.println("   - ACTION: No points awarded to group due to cap.");
-            }
-        }
-    }
-
-    public void printCurrentStateDetailed() {
-        System.out.println("\n====================== DETAILED CURRENT STATE ======================");
-        groups.values().forEach(group -> {
-            System.out.printf("\n--- Group: %s (ID: %s) | Total Points: %d ---\n", group.getName(), group.getId(), group.getTotalGroupPoints());
-            System.out.println("   Capped Activity Points: " + group.getCurrentActivityPoints());
-            persons.values().stream()
-                    .filter(p -> p.getGroupId().equals(group.getId()))
-                    .forEach(person -> {
-                        System.out.printf("   -> Person: %s (ID: %s)\n", person.getName(), person.getId());
-                        person.getPointHistory().forEach(entry ->
-                                System.out.printf("      - [%s] %s: %+d points\n", entry.timestamp().toString().substring(0, 19), entry.reason(), entry.pointsValue())
-                        );
-                        if (person.getPointHistory().isEmpty()) {
-                            System.out.println("      - No history yet.");
+                            // Update the last reset time
+                            lastResetTimeMap.put(resetKey, now);
                         }
-                    });
-        });
-        System.out.println("==================================================================\n");
+                    }
+
+                    int maxPoints = rule.getCap().getMaxPoints();
+                    int currentPointsForActivity = group.getCurrentPointsForActivity(rule.getRuleName());
+
+                    // Calculate how many points to award (up to the cap)
+                    int pointsToAward = outcome.getPoints();
+
+                    if (currentPointsForActivity >= maxPoints) {
+                        pointsToAward = 0; // Cap already reached, no more points
+                        System.out.printf("   - CAPPING: Rule '%s' has a cap of %d. Group already has %d. No points awarded.\n",
+                                rule.getRuleName(), maxPoints, currentPointsForActivity);
+                    } else if (currentPointsForActivity + pointsToAward > maxPoints) {
+                        pointsToAward = maxPoints - currentPointsForActivity; // Award partial points to hit the cap
+                        System.out.printf("   - CAPPING: Rule '%s' has a cap of %d. Group already has %d. Awarding %d points (partial).\n",
+                                rule.getRuleName(), maxPoints, currentPointsForActivity, pointsToAward);
+                    } else {
+                        System.out.printf("   - CAPPING: Rule '%s' has a cap of %d. Group already has %d. Awarding %d points.\n",
+                                rule.getRuleName(), maxPoints, currentPointsForActivity, pointsToAward);
+                    }
+
+                    // Update the group's tracking for this capped activity
+                    group.updateActivityPoints(rule.getRuleName(), currentPointsForActivity + pointsToAward);
+
+                    // Update the group's total score
+                    if (pointsToAward > 0) {
+                        group.addPoints(pointsToAward, outcome.getReason(), rule.getRuleName());
+                        groupRepository.save(group);
+                        System.out.printf("   - ACTION: Group '%s' score changed by %+d. New Total: %d.\n",
+                                group.getName(), pointsToAward, group.getTotalGroupPoints());
+                    }
+                } else {
+                    // For uncapped awards, simply add the points
+                    System.out.println("   - UNCAPPED AWARD: Adding " + outcome.getPoints() + " points for rule: " + rule.getRuleName());
+                    group.addPoints(outcome.getPoints(), outcome.getReason(), rule.getRuleName());
+                    groupRepository.save(group);
+                    System.out.printf("   - ACTION: Group '%s' score changed by %+d. New Total: %d.\n",
+                            group.getName(), outcome.getPoints(), group.getTotalGroupPoints());
+                }
+            } else {
+                // For penalties, simply add the points (which will be negative)
+                group.addPoints(outcome.getPoints(), outcome.getReason(), rule.getRuleName());
+                groupRepository.save(group);
+                System.out.printf("   - ACTION: Group '%s' score changed by %+d. New Total: %d.\n",
+                        group.getName(), outcome.getPoints(), group.getTotalGroupPoints());
+            }
+        }
     }
 
-    public void printSummary() {
-        System.out.println("\n######################## FINAL SUMMARY #########################");
 
-        System.out.println("\n## Individual Contribution History ##");
-        persons.values().stream()
-                .sorted(Comparator.comparing(Person::getName))
-                .forEach(person -> {
-                    String groupName = groups.get(person.getGroupId()).getName();
-                    String history = person.getPointHistory().stream()
-                            .map(entry -> String.format("%s: %+d", entry.reason(), entry.pointsValue()))
-                            .collect(Collectors.joining(", "));
-                    System.out.printf("- %s (%s): %s\n", person.getName(), groupName, history.isEmpty() ? "No contributions" : history);
-                });
-
-        System.out.println("\n## Team Standings ##");
-        List<Group> sortedGroups = new ArrayList<>(groups.values());
-        sortedGroups.sort(Comparator.comparingInt(Group::getTotalGroupPoints).reversed());
-
-        int rank = 1;
-        for (Group group : sortedGroups) {
-            System.out.printf("%d. %s - %d points\n", rank++, group.getName(), group.getTotalGroupPoints());
-        }
-        System.out.println("############################################################\n");
+    /**
+     * Gets the loaded rules.
+     *
+     * @return Map of rule names to rule configurations
+     */
+    public Map<String, RuleConfig> getRules() {
+        // Ensure rules are loaded before returning them
+        ensureRulesLoaded();
+        return Collections.unmodifiableMap(this.rules);
     }
 }

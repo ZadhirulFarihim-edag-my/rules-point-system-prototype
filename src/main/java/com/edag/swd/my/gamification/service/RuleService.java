@@ -1,7 +1,7 @@
 package com.edag.swd.my.gamification.service;
 
 import com.edag.swd.my.gamification.config.RuleConfig;
-import com.edag.swd.my.gamification.engine.EntityRuleEngine;
+import com.edag.swd.my.gamification.engine.RuleEngine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,11 +14,11 @@ import java.util.Map;
  */
 @Service
 public class RuleService {
-    private final EntityRuleEngine entityRuleEngine;
+    private final RuleEngine ruleEngine;
 
     @Autowired
-    public RuleService(EntityRuleEngine entityRuleEngine) {
-        this.entityRuleEngine = entityRuleEngine;
+    public RuleService(RuleEngine ruleEngine) {
+        this.ruleEngine = ruleEngine;
     }
 
     /**
@@ -28,7 +28,7 @@ public class RuleService {
      * @throws Exception If there's an error loading the rules
      */
     public void loadRules(String resourcePath) throws Exception {
-        entityRuleEngine.loadRules(resourcePath);
+        ruleEngine.loadRules(resourcePath);
     }
 
     /**
@@ -39,7 +39,7 @@ public class RuleService {
      */
     @Transactional
     public void processEvent(String actionType, Map<String, String> participants) {
-        entityRuleEngine.processEvent(actionType, participants);
+        ruleEngine.processEvent(actionType, participants);
     }
 
     /**
@@ -48,6 +48,6 @@ public class RuleService {
      * @return Map of rule names to rule configurations
      */
     public Map<String, RuleConfig> getRules() {
-        return entityRuleEngine.getRules();
+        return ruleEngine.getRules();
     }
 }

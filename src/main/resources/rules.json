@@ -42,8 +42,8 @@
     "outcomes": [
       {
         "type": "award",
+        "target": "individual",
         "points": 1,
-        "target": "contributor",
         "reason": "Forum Participant"
       }
     ]
@@ -62,8 +62,8 @@
     "outcomes": [
       {
         "type": "award",
+        "target": "individual",
         "points": 5,
-        "target": "participant",
         "reason": "Joined Hackathon"
       }
     ]
@@ -82,9 +82,98 @@
     "outcomes": [
       {
         "type": "award",
+        "target": "individual",
         "points": 10,
-        "target": "winner",
         "reason": "Won Team Game"
+      }
+    ]
+  },
+  {
+    "ruleName": "The one rule",
+    "description": "One rule to rule them all.",
+    "active": true,
+    "groupBasedActivity": true,
+    "conditions": [
+      {
+        "type": "action",
+        "value": "mr_knowledgeable"
+      }
+    ],
+    "outcomes": [
+      {
+        "type": "award",
+        "target": "individual",
+        "points": 100,
+        "reason": "The legend"
+      }
+    ]
+  },
+  {
+    "ruleName": "Sauron",
+    "description": "Massive penalties",
+    "active": true,
+    "groupBasedActivity": true,
+    "conditions": [
+      {
+        "type": "action",
+        "value": "mr_sauron"
+      }
+    ],
+    "outcomes": [
+      {
+        "type": "penalty",
+        "target": "individual",
+        "points": -500,
+        "reason": "The legend"
+      }
+    ]
+  },
+  {
+    "ruleName": "Goblin techies",
+    "description": "It's either you win or you lose",
+    "active": true,
+    "groupBasedActivity": true,
+    "conditions": [
+      {
+        "type": "action",
+        "value": "goblin_techies_rule"
+      }
+    ],
+    "outcomes": [
+      {
+        "type": "penalty",
+        "points": -20,
+        "target": "participant",
+        "reason": "Losing as techies"
+      },
+      {
+        "type": "award",
+        "points": 20,
+        "target": "compliant",
+        "reason": "win as techies"
+      }
+    ],
+    "cap": {
+      "maxPoints": 100
+    }
+  },
+  {
+    "ruleName": "Rule Ape Ape la",
+    "description": "Saje nak test",
+    "active": true,
+    "groupBasedActivity": true,
+    "conditions": [
+      {
+        "type": "action",
+        "value": "saje_saje_menang"
+      }
+    ],
+    "outcomes": [
+      {
+        "type": "award",
+        "target": "individual",
+        "points": 7,
+        "reason": "Saje saje nak menang"
       }
     ]
   }

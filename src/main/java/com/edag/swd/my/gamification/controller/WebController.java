@@ -90,22 +90,60 @@ public class WebController {
     @PostMapping("/rules/execute/{actionType}")
     public String executeRule(
             @PathVariable String actionType,
-            @RequestParam(required = false) String participantId,
-            @RequestParam(required = false) List<String> participantIds,
-            @RequestParam String targetRole,
+            @RequestParam(required = false) List<String> penaltyIds,
+            @RequestParam(required = false) List<String> awardIds,
+            @RequestParam(required = false) Map<String, String> allParams,
             RedirectAttributes redirectAttributes) {
 
         Map<String, String> participants = new HashMap<>();
 
-        // Handle multiple participants (for SAP Hours Offender)
-        if (participantIds != null && !participantIds.isEmpty()) {
-            for (String id : participantIds) {
-                participants.put(targetRole, id);
+        // Find the rule by action type
+        RuleConfig rule = ruleService.getRules().values().stream()
+                .filter(r -> r.getConditions().stream()
+                        .anyMatch(c -> c.getValue().equals(actionType)))
+                .findFirst()
+                .orElse(null);
+
+        // If rule is not found or not active, redirect to a rule list
+        if (rule == null || !rule.isActive()) {
+            redirectAttributes.addFlashAttribute("error", "Rule not found or inactive");
+            return "redirect:/rules";
+        }
+
+        // Process penalty recipients
+        if (penaltyIds != null && !penaltyIds.isEmpty()) {
+            // Get all penalty targets from the rule's outcomes
+            List<String> penaltyTargets = rule.getOutcomes().stream()
+                    .filter(outcome -> "penalty".equalsIgnoreCase(outcome.getType()))
+                    .map(outcome -> outcome.getTarget() != null ? outcome.getTarget() : "individual")
+                    .distinct()
+                    .toList();
+
+            // If there are penalty targets, use the first one (most rules have only one)
+            String penaltyTarget = penaltyTargets.isEmpty() ? "individual" : penaltyTargets.getFirst();
+
+            // Add all penalty recipients with the appropriate target role
+            for (String id : penaltyIds) {
+                participants.put(penaltyTarget, id);
             }
         }
-        // Handle single participant (for other rules)
-        else if (participantId != null) {
-            participants.put(targetRole, participantId);
+
+        // Process award recipients
+        if (awardIds != null && !awardIds.isEmpty()) {
+            // Get all award targets from the rule's outcomes
+            List<String> awardTargets = rule.getOutcomes().stream()
+                    .filter(outcome -> "award".equalsIgnoreCase(outcome.getType()))
+                    .map(outcome -> outcome.getTarget() != null ? outcome.getTarget() : "individual")
+                    .distinct()
+                    .toList();
+
+            // If there are award targets, use the first one (most rules have only one)
+            String awardTarget = awardTargets.isEmpty() ? "individual" : awardTargets.getFirst();
+
+            // Add all award recipients with the appropriate target role
+            for (String id : awardIds) {
+                participants.put(awardTarget, id);
+            }
         }
 
         // Process the event

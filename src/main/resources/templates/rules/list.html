@@ -19,25 +19,40 @@
             <div th:each="rule : ${rules}" class="col-md-4 mb-4">
                 <div class="card h-100">
                     <div class="card-header"
-                         th:classappend="${rule.outcomes[0].type == 'award' ? 'bg-success' : 'bg-danger'} + ' text-white'">
+                         th:with="hasAward=${rule.outcomes.?[type == 'award'].size() > 0}, 
+                                 hasPenalty=${rule.outcomes.?[type == 'penalty'].size() > 0}"
+                         th:classappend="${hasAward && hasPenalty ? 'bg-warning' : (hasAward ? 'bg-success' : 'bg-danger')} + ' text-white'">
                         <h5 class="card-title mb-0" th:text="${rule.ruleName}">Rule Name</h5>
                     </div>
                     <div class="card-body">
                         <p class="card-text" th:text="${rule.description}">Rule description</p>
-                        <p>
-                            <strong>Effect:</strong>
-                            <span th:if="${rule.outcomes[0].type == 'award'}">
-                                    +<span th:text="${rule.outcomes[0].points}">0</span> points to the 
-                                    <span th:text="${rule.outcomes[0].target}">target</span>'s group.
-                                </span>
-                            <span th:if="${rule.outcomes[0].type == 'penalty'}">
-                                    <span th:text="${rule.outcomes[0].points}">0</span> points penalty to the 
-                                    <span th:text="${rule.outcomes[0].target}">target</span>'s group.
-                                </span>
-                        </p>
+                        <p><strong>Effect:</strong></p>
+
+                        <!-- Display all award outcomes -->
+                        <div th:each="outcome : ${rule.outcomes}" th:if="${outcome.type == 'award'}" class="mb-2">
+                            <span class="badge bg-success">Award</span>
+                            +<span th:text="${outcome.points}">0</span> points to the
+                            <span th:text="${outcome.target != null ? outcome.target : 'participant'}">target</span>'s
+                            group.
+                            <span th:if="${outcome.reason}" class="text-muted">(<span
+                                    th:text="${outcome.reason}">reason</span>)</span>
+                        </div>
+
+                        <!-- Display all penalty outcomes -->
+                        <div th:each="outcome : ${rule.outcomes}" th:if="${outcome.type == 'penalty'}" class="mb-2">
+                            <span class="badge bg-danger">Penalty</span>
+                            <span th:text="${outcome.points}">0</span> points penalty to the
+                            <span th:text="${outcome.target != null ? outcome.target : 'participant'}">target</span>'s
+                            group.
+                            <span th:if="${outcome.reason}" class="text-muted">(<span
+                                    th:text="${outcome.reason}">reason</span>)</span>
+                        </div>
+
                         <a th:href="@{'/rules/' + ${rule.ruleName.replace(' ', '-').toLowerCase()}}"
-                           class="btn"
-                           th:classappend="${rule.outcomes[0].type == 'award' ? 'btn-outline-success' : 'btn-outline-danger'}">
+                           class="btn mt-3"
+                           th:with="hasAward=${rule.outcomes.?[type == 'award'].size() > 0}, 
+                                   hasPenalty=${rule.outcomes.?[type == 'penalty'].size() > 0}"
+                           th:classappend="${hasAward && hasPenalty ? 'btn-outline-warning' : (hasAward ? 'btn-outline-success' : 'btn-outline-danger')}">
                             Execute Rule
                         </a>
                     </div>

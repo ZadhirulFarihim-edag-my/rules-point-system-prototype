@@ -79,17 +79,11 @@
                     <span>Rules</span>
                 </h6>
                 <ul class="nav flex-column">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/rules/sap-offender">SAP Hours</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/rules/forum-participant">Forum Participant</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/rules/join-hackathon">Join Hackathon</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/rules/win-team-game">Win Team Game</a>
+                    <!-- Dynamically generate links for each rule -->
+                    <li class="nav-item" th:each="rule : ${allRules}">
+                        <a class="nav-link"
+                           th:href="@{'/rules/' + ${rule.ruleName.replace(' ', '-').toLowerCase()}}"
+                           th:text="${rule.ruleName}">Rule Name</a>
                     </li>
                 </ul>
 

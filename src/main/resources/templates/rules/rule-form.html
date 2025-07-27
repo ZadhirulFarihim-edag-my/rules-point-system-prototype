@@ -11,14 +11,17 @@
 
         <div class="alert alert-info">
             <p><strong>Rule Description:</strong> <span th:text="${rule.description}">Rule description</span></p>
-            <p th:if="${rule.outcomes[0].type == 'award'}">
-                <strong>Effect:</strong> +<span th:text="${rule.outcomes[0].points}">0</span> points to the
-                <span th:text="${rule.outcomes[0].target}">target</span>'s group.
-            </p>
-            <p th:if="${rule.outcomes[0].type == 'penalty'}">
-                <strong>Effect:</strong> <span th:text="${rule.outcomes[0].points}">0</span> points penalty to the
-                <span th:text="${rule.outcomes[0].target}">target</span>'s group.
-            </p>
+            <div th:each="outcome : ${rule.outcomes}">
+                <p th:if="${outcome.type == 'award'}">
+                    <strong>Effect:</strong> +<span th:text="${outcome.points}">0</span> points to the
+                    <span th:text="${outcome.target}">target</span>'s group.
+                </p>
+                <p th:if="${outcome.type == 'penalty'}">
+                    <strong>Effect:</strong> <span th:text="${outcome.points}">0</span> points penalty to the
+                    <span th:text="${outcome.target}">target</span>'s group.
+                </p>
+            </div>
+
             <p th:if="${rule.cap != null}">
                 <strong>Cap:</strong> Maximum of <span th:text="${rule.cap.maxPoints}">0</span> points per group.
             </p>
@@ -32,80 +35,175 @@
 
         <div class="card">
             <div class="card-header"
-                 th:classappend="${rule.outcomes[0].type == 'award' ? 'bg-success' : 'bg-danger'} + ' text-white'">
+                 th:with="hasAward=${rule.outcomes.?[type == 'award'].size() > 0}, 
+                         hasPenalty=${rule.outcomes.?[type == 'penalty'].size() > 0}"
+                 th:classappend="${hasAward && hasPenalty ? 'bg-warning' : (hasAward ? 'bg-success' : 'bg-danger')} + ' text-white'">
                 <h5 class="card-title mb-0" th:text="'Execute ' + ${rule.ruleName}">Execute Rule</h5>
             </div>
             <div class="card-body">
-                <!-- Form for SAP Hours (multiple selection) -->
-                <form th:if="${rule.ruleName == 'SAP Hours'}"
-                      th:action="@{'/rules/execute/' + ${rule.conditions[0].value}}" method="post" id="offender-form">
-                    <div class="mb-3">
-                        <label class="form-label">Select Offenders:</label>
-                        <div class="row">
-                            <div class="col-md-4 mb-2" th:each="person : ${persons}">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="participantIds"
-                                           th:value="${person.id}" th:id="'person-' + ${person.id}">
-                                    <label class="form-check-label" th:for="'person-' + ${person.id}">
-                                        <span th:text="${person.name}">Person Name</span>
-                                        <small class="text-muted" th:text="'(Group: ' + ${person.group.name} + ')'">Group</small>
+                <!-- Inactive rule message -->
+                <div th:if="${!rule.active}" class="alert alert-warning">
+                    <p><strong>This rule is currently inactive.</strong> The execution form has been disabled.</p>
+                </div>
+                <!-- Generic rule execution form -->
+                <form th:action="@{'/rules/execute/' + ${rule.conditions[0].value}}" method="post" id="rule-form"
+                      th:classappend="${!rule.active ? 'disabled' : ''}">
+                    <fieldset th:disabled="${!rule.active}">
+                        <!-- Dynamic sections based on outcome types -->
+                        <div th:with="hasPenalty=${rule.outcomes.?[type == 'penalty'].size() > 0},
+                                     hasAward=${rule.outcomes.?[type == 'award'].size() > 0}">
+
+                            <!-- Penalty section (if rule has penalty outcomes) -->
+                            <div th:if="${hasPenalty}" class="mb-4">
+                                <h5 class="text-danger mb-3">Penalty Recipients</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        Select persons who will receive penalties:
                                     </label>
+                                    <div class="row">
+                                        <div class="col-md-4 mb-2" th:each="person : ${persons}">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="penaltyIds"
+                                                       th:value="${person.id}" th:id="'penalty-' + ${person.id}">
+                                                <label class="form-check-label" th:for="'penalty-' + ${person.id}">
+                                                    <span th:text="${person.name}">Person Name</span>
+                                                    <small class="text-muted"
+                                                           th:text="'(Group: ' + ${person.group.name} + ')'">Group</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Add hidden inputs for penalty targets -->
+                                <div th:each="outcome, status : ${rule.outcomes}" th:if="${outcome.type == 'penalty'}">
+                                    <input type="hidden" th:name="'penaltyTarget' + ${status.index}"
+                                           th:value="${outcome.target != null ? outcome.target : 'participant'}">
                                 </div>
                             </div>
+
+                            <!-- Award section (if rule has award outcomes) -->
+                            <div th:if="${hasAward}" class="mb-4">
+                                <h5 class="text-success mb-3">Award Recipients</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        Select persons who will receive awards:
+                                    </label>
+                                    <div class="row">
+                                        <div class="col-md-4 mb-2" th:each="person : ${persons}">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="awardIds"
+                                                       th:value="${person.id}" th:id="'award-' + ${person.id}">
+                                                <label class="form-check-label" th:for="'award-' + ${person.id}">
+                                                    <span th:text="${person.name}">Person Name</span>
+                                                    <small class="text-muted"
+                                                           th:text="'(Group: ' + ${person.group.name} + ')'">Group</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Add hidden inputs for award targets -->
+                                <div th:each="outcome, status : ${rule.outcomes}" th:if="${outcome.type == 'award'}">
+                                    <input type="hidden" th:name="'awardTarget' + ${status.index}"
+                                           th:value="${outcome.target != null ? outcome.target : 'participant'}">
+                                </div>
+                            </div>
+
+                            <!-- Additional fields for Win Team Game -->
+                            <div th:if="${rule.ruleName == 'Win Team Game'}" class="mb-4">
+                                <h5 class="mb-3">Additional Information</h5>
+                                <div class="mb-3">
+                                    <label for="gameType" class="form-label">Game Type:</label>
+                                    <select class="form-select" id="gameType" name="gameType">
+                                        <option value="Team Building">Team Building</option>
+                                        <option value="Problem Solving">Problem Solving</option>
+                                        <option value="Coding Competition">Coding Competition</option>
+                                        <option value="Design Challenge">Design Challenge</option>
+                                        <option value="Quiz Competition">Quiz Competition</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="gameName" class="form-label">Game Name (Optional):</label>
+                                    <input type="text" class="form-control" id="gameName" name="gameName"
+                                           placeholder="Enter game name">
+                                </div>
+                            </div>
+
+                            <!-- Submit button -->
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="submit" class="btn"
+                                        th:classappend="${hasAward && hasPenalty ? 'btn-warning' : (hasAward ? 'btn-success' : 'btn-danger')}"
+                                        th:text="${hasAward && hasPenalty ? 'Apply Penalties and Awards' : (hasAward ? 'Award Points' : 'Apply Penalty')}">
+                                    Submit
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <input type="hidden" name="targetRole" th:value="${rule.outcomes[0].target}">
-                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <button type="submit" class="btn btn-danger">Apply Penalty</button>
-                    </div>
+                    </fieldset>
                 </form>
 
-                <!-- Form for all other rules (single selection) -->
-                <form th:unless="${rule.ruleName == 'SAP Hours'}"
-                      th:action="@{'/rules/execute/' + ${rule.conditions[0].value}}" method="post" id="standard-form">
-                    <div class="mb-3">
-                        <label for="participantId" class="form-label"
-                               th:text="'Select ' + ${rule.outcomes[0].target} + ':'">Select Person:</label>
-                        <select class="form-select" id="participantId" name="participantId" required>
-                            <option value="" selected disabled>-- Select a person --</option>
-                            <option th:each="person : ${persons}"
-                                    th:value="${person.id}"
-                                    th:text="${person.name} + ' (Group: ' + ${person.group.name} + ')'">
-                                Person Name (Group)
-                            </option>
-                        </select>
-                    </div>
-                    <input type="hidden" name="targetRole" th:value="${rule.outcomes[0].target}">
-
-                    <!-- Additional fields for Win Team Game -->
-                    <div th:if="${rule.ruleName == 'Win Team Game'}">
-                        <div class="mb-3">
-                            <label for="gameType" class="form-label">Game Type:</label>
-                            <select class="form-select" id="gameType" name="gameType">
-                                <option value="Team Building">Team Building</option>
-                                <option value="Problem Solving">Problem Solving</option>
-                                <option value="Coding Competition">Coding Competition</option>
-                                <option value="Design Challenge">Design Challenge</option>
-                                <option value="Quiz Competition">Quiz Competition</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="gameName" class="form-label">Game Name (Optional):</label>
-                            <input type="text" class="form-control" id="gameName" name="gameName"
-                                   placeholder="Enter game name">
-                        </div>
-                    </div>
-
-                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <button type="submit" class="btn"
-                                th:classappend="${rule.outcomes[0].type == 'award' ? 'btn-success' : 'btn-danger'}"
-                                th:text="${rule.outcomes[0].type == 'award' ? 'Award Points' : 'Apply Penalty'}">
-                            Submit
-                        </button>
-                    </div>
-                </form>
+                <!-- JavaScript for mutual exclusion between penalty and award checkboxes -->
+                <script th:if="${rule.outcomes.?[type == 'penalty'].size() > 0 && rule.outcomes.?[type == 'award'].size() > 0}">
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Get all penalty and award checkboxes
+                        const penaltyCheckboxes = document.querySelectorAll('input[name="penaltyIds"]');
+                        const awardCheckboxes = document.querySelectorAll('input[name="awardIds"]');
+                        
+                        // Create a map of person IDs to their checkboxes
+                        const checkboxMap = {};
+                        
+                        // Process penalty checkboxes
+                        penaltyCheckboxes.forEach(checkbox => {
+                            const personId = checkbox.value;
+                            if (!checkboxMap[personId]) {
+                                checkboxMap[personId] = {};
+                            }
+                            checkboxMap[personId].penalty = checkbox;
+                            
+                            // Add change event listener
+                            checkbox.addEventListener('change', function() {
+                                if (checkboxMap[personId].award) {
+                                    if (this.checked) {
+                                        // If penalty checkbox is checked, disable award checkbox
+                                        checkboxMap[personId].award.disabled = true;
+                                        checkboxMap[personId].award.parentElement.classList.add('text-muted');
+                                    } else {
+                                        // If penalty checkbox is unchecked, enable award checkbox
+                                        checkboxMap[personId].award.disabled = false;
+                                        checkboxMap[personId].award.parentElement.classList.remove('text-muted');
+                                    }
+                                }
+                            });
+                        });
+                        
+                        // Process award checkboxes
+                        awardCheckboxes.forEach(checkbox => {
+                            const personId = checkbox.value;
+                            if (!checkboxMap[personId]) {
+                                checkboxMap[personId] = {};
+                            }
+                            checkboxMap[personId].award = checkbox;
+                            
+                            // Add change event listener
+                            checkbox.addEventListener('change', function() {
+                                if (checkboxMap[personId].penalty) {
+                                    if (this.checked) {
+                                        // If award checkbox is checked, disable penalty checkbox
+                                        checkboxMap[personId].penalty.disabled = true;
+                                        checkboxMap[personId].penalty.parentElement.classList.add('text-muted');
+                                    } else {
+                                        // If award checkbox is unchecked, enable penalty checkbox
+                                        checkboxMap[personId].penalty.disabled = false;
+                                        checkboxMap[personId].penalty.parentElement.classList.remove('text-muted');
+                                    }
+                                }
+                            });
+                        });
+                    });
+                </script>
             </div>
         </div>
 
@@ -119,7 +217,17 @@
                     a cap of 2 points per group).
                 </li>
             </ol>
-            <ol th:unless="${rule.ruleName == 'SAP Hours'}">
+            <ol th:if="${rule.ruleName == 'Goblin techies'}">
+                <li>Select one or more persons who will receive the penalty (offenders).</li>
+                <li>Select one or more persons who will receive the award (award recipients).</li>
+                <li>Click "Apply Penalties and Awards" to execute the rule.</li>
+                <li>Each offender's group will receive a -20 point penalty.</li>
+                <li>Each award recipient's group will receive a +20 point award (subject to a cap of 100 points per
+                    group).
+                </li>
+                <li>Only the specifically selected persons will receive penalties or awards.</li>
+            </ol>
+            <ol th:unless="${rule.ruleName == 'SAP Hours' or rule.ruleName == 'Goblin techies'}">
                 <li th:text="'Select a person who is the ' + ${rule.outcomes[0].target} + '.'">Select a person.</li>
                 <li th:if="${rule.ruleName == 'Win Team Game'}">Select the type of game that was played.</li>
                 <li th:if="${rule.ruleName == 'Win Team Game'}">Optionally, enter the name of the game for
