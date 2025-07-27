@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller("/api/")
 public class WebController {
@@ -46,6 +47,16 @@ public class WebController {
         // Sort persons by total accumulated points (highest first)
         List<Person> sortedPersons = new ArrayList<>(persons);
         sortedPersons.sort(Comparator.comparingInt(Person::getTotalAccumulatedPoints).reversed());
+
+        // Group persons by group (null-safe)
+        Map<String, Long> groupCounts = sortedPersons.stream()
+                .collect(Collectors.groupingBy(
+                        p -> p.getGroup() != null ? p.getGroup().getName() : "None",
+                        LinkedHashMap::new,
+                        Collectors.counting()
+                ));
+
+        model.addAttribute("groupCounts", groupCounts);
 
         model.addAttribute("persons", sortedPersons);
         return "persons/list";

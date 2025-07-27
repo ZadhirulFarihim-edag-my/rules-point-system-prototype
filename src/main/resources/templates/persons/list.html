@@ -129,12 +129,12 @@
                                     <th>Number of Persons</th>
                                 </tr>
                                 </thead>
-                                <!--                                    <tbody>-->
-                                <!--                                        <tr th:each="group : ${persons.stream().map(p -> p.group).distinct().toList()}">-->
-                                <!--                                            <td th:text="${group != null ? group.name : 'None'}">Group Name</td>-->
-                                <!--                                            <td th:text="${persons.stream().filter(p -> p.group != null && p.group.id == group.id).count()}">Count</td>-->
-                                <!--                                        </tr>-->
-                                <!--                                    </tbody>-->
+                                <tbody>
+                                <tr th:each="entry : ${groupCounts}">
+                                    <td th:text="${entry.key}">Group Name</td>
+                                    <td th:text="${entry.value}">Count</td>
+                                </tr>
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -148,9 +148,7 @@
                     </div>
                     <div class="card-body">
                         <div class="list-group">
-                            <a href="/rules/sap-offender" class="list-group-item list-group-item-action">Record SAP
-                                Hours Non-Compliant Members</a>
-                            <a href="/rules" class="list-group-item list-group-item-action">Execute Other Rules</a>
+                            <a href="/rules" class="list-group-item list-group-item-action">Execute Rules</a>
                         </div>
                     </div>
                 </div>
