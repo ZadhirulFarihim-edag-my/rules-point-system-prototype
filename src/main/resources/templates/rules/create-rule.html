@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/default :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>Create Rule - Gamification System</title>
+</head>
+<body>
+<section>
+    <div class="container">
+        <h2 class="mb-4">Create New Rule</h2>
+
+        <div class="alert alert-info">
+            <p>Create a new rule by filling out the form below. Rules define how points are awarded or penalized based
+                on actions.</p>
+        </div>
+
+        <!-- Success message -->
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <span th:text="${success}">Success message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <!-- Error message -->
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <span th:text="${error}">Error message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">Rule Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form id="ruleForm" th:action="@{/rules/save}" method="post">
+                    <!-- Basic Rule Information -->
+                    <div class="mb-4">
+                        <h5>Basic Information</h5>
+                        <div class="mb-3">
+                            <label for="ruleName" class="form-label">Rule Name <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="ruleName" name="ruleName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description <span
+                                    class="text-danger">*</span></label>
+                            <textarea class="form-control" id="description" name="description" rows="3"
+                                      required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Active <span class="text-danger">*</span></label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="active" id="activeTrue" value="true"
+                                       checked>
+                                <label class="form-check-label" for="activeTrue">
+                                    Yes
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="active" id="activeFalse"
+                                       value="false">
+                                <label class="form-check-label" for="activeFalse">
+                                    No
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Group Based Activity <span class="text-danger">*</span></label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="groupBasedActivity"
+                                       id="groupBasedTrue" value="true" checked>
+                                <label class="form-check-label" for="groupBasedTrue">
+                                    Yes
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="groupBasedActivity"
+                                       id="groupBasedFalse" value="false">
+                                <label class="form-check-label" for="groupBasedFalse">
+                                    No
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Conditions -->
+                    <div class="mb-4">
+                        <h5>Conditions</h5>
+                        <p class="text-muted">Define when this rule should be triggered.</p>
+
+                        <div id="conditionsContainer">
+                            <div class="condition-item mb-3 border p-3 rounded">
+                                <div class="mb-3">
+                                    <label class="form-label">Type <span class="text-danger">*</span></label>
+                                    <select class="form-select" name="conditions[0].type" required>
+                                        <option value="action" selected>Action</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Value <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="conditions[0].value"
+                                           placeholder="e.g., forum_participation" required>
+                                    <div class="form-text">Enter a unique identifier for this action (use lowercase and
+                                        underscores).
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-outline-primary" id="addConditionBtn">
+                            <i class="bi bi-plus-circle"></i> Add Condition
+                        </button>
+                    </div>
+
+                    <!-- Outcomes -->
+                    <div class="mb-4">
+                        <h5>Outcomes</h5>
+                        <p class="text-muted">Define the effects of this rule (awards or penalties).</p>
+
+                        <div id="outcomesContainer">
+                            <div class="outcome-item mb-3 border p-3 rounded">
+                                <div class="mb-3">
+                                    <label class="form-label">Type <span class="text-danger">*</span></label>
+                                    <select class="form-select outcome-type" name="outcomes[0].type" required>
+                                        <option value="award" selected>Award</option>
+                                        <option value="penalty">Penalty</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Points <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control outcome-points" name="outcomes[0].points"
+                                           value="1" required>
+                                    <div class="form-text">Positive for awards, negative for penalties.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Target <span class="text-danger">*</span></label>
+                                    <select class="form-select" name="outcomes[0].target" required>
+                                        <option value="individual" selected>Individual</option>
+                                        <option value="offender">Offender</option>
+                                        <option value="compliant">Compliant</option>
+                                        <option value="participant">Participant</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Reason <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="outcomes[0].reason" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-outline-primary" id="addOutcomeBtn">
+                            <i class="bi bi-plus-circle"></i> Add Outcome
+                        </button>
+                    </div>
+
+                    <!-- Cap (Optional) -->
+                    <div class="mb-4">
+                        <h5>Cap (Optional)</h5>
+                        <p class="text-muted">Set a maximum limit for points that can be awarded by this rule.</p>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="hasCap">
+                            <label class="form-check-label" for="hasCap">
+                                Enable cap for this rule
+                            </label>
+                        </div>
+
+                        <div id="capContainer" style="display: none;">
+                            <div class="mb-3">
+                                <label for="maxPoints" class="form-label">Maximum Points</label>
+                                <input type="number" class="form-control" id="maxPoints" name="cap.maxPoints"
+                                       value="10">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary">Create Rule</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript for dynamic form fields -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cap toggle
+            const hasCapCheckbox = document.getElementById('hasCap');
+            const capContainer = document.getElementById('capContainer');
+            
+            hasCapCheckbox.addEventListener('change', function() {
+                capContainer.style.display = this.checked ? 'block' : 'none';
+                
+                // If unchecked, clear the maxPoints value
+                if (!this.checked) {
+                    document.getElementById('maxPoints').value = '';
+                }
+            });
+            
+            // Add condition button
+            const addConditionBtn = document.getElementById('addConditionBtn');
+            const conditionsContainer = document.getElementById('conditionsContainer');
+            let conditionCount = 1;
+            
+            addConditionBtn.addEventListener('click', function() {
+                const conditionItem = document.createElement('div');
+                conditionItem.className = 'condition-item mb-3 border p-3 rounded';
+                conditionItem.innerHTML = `
+                    <div class="d-flex justify-content-end mb-2">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-condition">
+                            <i class="bi bi-trash"></i> Remove
+                        </button>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type <span class="text-danger">*</span></label>
+                        <select class="form-select" name="conditions[${conditionCount}].type" required>
+                            <option value="action" selected>Action</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Value <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="conditions[${conditionCount}].value" placeholder="e.g., forum_participation" required>
+                        <div class="form-text">Enter a unique identifier for this action (use lowercase and underscores).</div>
+                    </div>
+                `;
+                conditionsContainer.appendChild(conditionItem);
+                conditionCount++;
+                
+                // Add event listener to the remove button
+                const removeBtn = conditionItem.querySelector('.remove-condition');
+                removeBtn.addEventListener('click', function() {
+                    conditionsContainer.removeChild(conditionItem);
+                    updateConditionIndices();
+                });
+            });
+            
+            // Add outcome button
+            const addOutcomeBtn = document.getElementById('addOutcomeBtn');
+            const outcomesContainer = document.getElementById('outcomesContainer');
+            let outcomeCount = 1;
+            
+            addOutcomeBtn.addEventListener('click', function() {
+                const outcomeItem = document.createElement('div');
+                outcomeItem.className = 'outcome-item mb-3 border p-3 rounded';
+                outcomeItem.innerHTML = `
+                    <div class="d-flex justify-content-end mb-2">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-outcome">
+                            <i class="bi bi-trash"></i> Remove
+                        </button>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type <span class="text-danger">*</span></label>
+                        <select class="form-select outcome-type" name="outcomes[${outcomeCount}].type" required>
+                            <option value="award" selected>Award</option>
+                            <option value="penalty">Penalty</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Points <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control outcome-points" name="outcomes[${outcomeCount}].points" value="1" required>
+                        <div class="form-text">Positive for awards, negative for penalties.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Target <span class="text-danger">*</span></label>
+                        <select class="form-select" name="outcomes[${outcomeCount}].target" required>
+                            <option value="individual" selected>Individual</option>
+                            <option value="offender">Offender</option>
+                            <option value="compliant">Compliant</option>
+                            <option value="participant">Participant</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="outcomes[${outcomeCount}].reason" required>
+                    </div>
+                `;
+                outcomesContainer.appendChild(outcomeItem);
+                outcomeCount++;
+                
+                // Add event listener to the remove button
+                const removeBtn = outcomeItem.querySelector('.remove-outcome');
+                removeBtn.addEventListener('click', function() {
+                    outcomesContainer.removeChild(outcomeItem);
+                    updateOutcomeIndices();
+                });
+                
+                // Add event listener to the type select
+                const typeSelect = outcomeItem.querySelector('.outcome-type');
+                const pointsInput = outcomeItem.querySelector('.outcome-points');
+                
+                typeSelect.addEventListener('change', function() {
+                    if (this.value === 'penalty' && pointsInput.value > 0) {
+                        pointsInput.value = -Math.abs(pointsInput.value);
+                    } else if (this.value === 'award' && pointsInput.value < 0) {
+                        pointsInput.value = Math.abs(pointsInput.value);
+                    }
+                });
+            });
+            
+            // Update condition indices when a condition is removed
+            function updateConditionIndices() {
+                const conditionItems = document.querySelectorAll('.condition-item');
+                conditionItems.forEach((item, index) => {
+                    const typeSelect = item.querySelector('select[name^="conditions"]');
+                    const valueInput = item.querySelector('input[name^="conditions"]');
+                    
+                    typeSelect.name = `conditions[${index}].type`;
+                    valueInput.name = `conditions[${index}].value`;
+                });
+                conditionCount = conditionItems.length;
+            }
+            
+            // Update outcome indices when an outcome is removed
+            function updateOutcomeIndices() {
+                const outcomeItems = document.querySelectorAll('.outcome-item');
+                outcomeItems.forEach((item, index) => {
+                    const typeSelect = item.querySelector('select[name^="outcomes"][name$=".type"]');
+                    const pointsInput = item.querySelector('input[name^="outcomes"][name$=".points"]');
+                    const targetSelect = item.querySelector('select[name^="outcomes"][name$=".target"]');
+                    const reasonInput = item.querySelector('input[name^="outcomes"][name$=".reason"]');
+                    
+                    typeSelect.name = `outcomes[${index}].type`;
+                    pointsInput.name = `outcomes[${index}].points`;
+                    targetSelect.name = `outcomes[${index}].target`;
+                    reasonInput.name = `outcomes[${index}].reason`;
+                });
+                outcomeCount = outcomeItems.length;
+            }
+            
+            // Add event listener to the first outcome type select
+            const firstTypeSelect = document.querySelector('.outcome-type');
+            const firstPointsInput = document.querySelector('.outcome-points');
+            
+            firstTypeSelect.addEventListener('change', function() {
+                if (this.value === 'penalty' && firstPointsInput.value > 0) {
+                    firstPointsInput.value = -Math.abs(firstPointsInput.value);
+                } else if (this.value === 'award' && firstPointsInput.value < 0) {
+                    firstPointsInput.value = Math.abs(firstPointsInput.value);
+                }
+            });
+            
+            // Form submission
+            const ruleForm = document.getElementById('ruleForm');
+            
+            ruleForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                // Validate form
+                if (!validateForm()) {
+                    return;
+                }
+                
+                // Create rule object
+                const formData = new FormData(ruleForm);
+                const rule = {
+                    ruleName: formData.get('ruleName'),
+                    description: formData.get('description'),
+                    active: formData.get('active') === 'true',
+                    groupBasedActivity: formData.get('groupBasedActivity') === 'true',
+                    conditions: [],
+                    outcomes: []
+                };
+                
+                // Add conditions
+                const conditionItems = document.querySelectorAll('.condition-item');
+                conditionItems.forEach((item, index) => {
+                    rule.conditions.push({
+                        type: formData.get(`conditions[${index}].type`),
+                        value: formData.get(`conditions[${index}].value`)
+                    });
+                });
+                
+                // Add outcomes
+                const outcomeItems = document.querySelectorAll('.outcome-item');
+                outcomeItems.forEach((item, index) => {
+                    rule.outcomes.push({
+                        type: formData.get(`outcomes[${index}].type`),
+                        points: parseInt(formData.get(`outcomes[${index}].points`)),
+                        target: formData.get(`outcomes[${index}].target`),
+                        reason: formData.get(`outcomes[${index}].reason`)
+                    });
+                });
+                
+                // Add cap if enabled
+                if (hasCapCheckbox.checked) {
+                    rule.cap = {
+                        maxPoints: parseInt(formData.get('cap.maxPoints'))
+                    };
+                }
+                
+                // Convert rule to JSON and submit
+                const ruleJson = JSON.stringify(rule);
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'ruleJson';
+                hiddenInput.value = ruleJson;
+                ruleForm.appendChild(hiddenInput);
+                
+                // Submit the form
+                ruleForm.submit();
+            });
+            
+            // Form validation
+            function validateForm() {
+                // Check if rule name is provided
+                const ruleName = document.getElementById('ruleName').value.trim();
+                if (!ruleName) {
+                    alert('Please provide a rule name.');
+                    return false;
+                }
+                
+                // Check if description is provided
+                const description = document.getElementById('description').value.trim();
+                if (!description) {
+                    alert('Please provide a description.');
+                    return false;
+                }
+                
+                // Check if at least one condition is provided
+                const conditionItems = document.querySelectorAll('.condition-item');
+                for (let i = 0; i < conditionItems.length; i++) {
+                    const valueInput = conditionItems[i].querySelector('input[name^="conditions"][name$=".value"]');
+                    if (!valueInput.value.trim()) {
+                        alert('Please provide a value for all conditions.');
+                        return false;
+                    }
+                }
+                
+                // Check if at least one outcome is provided
+                const outcomeItems = document.querySelectorAll('.outcome-item');
+                for (let i = 0; i < outcomeItems.length; i++) {
+                    const pointsInput = outcomeItems[i].querySelector('input[name^="outcomes"][name$=".points"]');
+                    const reasonInput = outcomeItems[i].querySelector('input[name^="outcomes"][name$=".reason"]');
+                    
+                    if (!pointsInput.value) {
+                        alert('Please provide points for all outcomes.');
+                        return false;
+                    }
+                    
+                    if (!reasonInput.value.trim()) {
+                        alert('Please provide a reason for all outcomes.');
+                        return false;
+                    }
+                }
+                
+                // Check if cap is valid
+                if (hasCapCheckbox.checked) {
+                    const maxPoints = document.getElementById('maxPoints').value;
+                    if (!maxPoints || maxPoints <= 0) {
+                        alert('Please provide a valid maximum points value (greater than 0).');
+                        return false;
+                    }
+                }
+                
+                return true;
+            }
+        });
+    </script>
+</section>
+</body>
+</html>

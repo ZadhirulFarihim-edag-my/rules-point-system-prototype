@@ -13,7 +13,6 @@ stores Person and Group entities in a database and provides a web interface for 
 - **Spring Boot**: Application framework
 - **Spring Data JPA**: Data access layer
 - **H2 Database**: In-memory database (default)
-- **MySQL**: Optional persistent database
 - **Thymeleaf**: Server-side Java template engine
 - **Bootstrap 5**: Frontend framework
 - **Maven**: Build and dependency management

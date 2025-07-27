@@ -3,14 +3,14 @@ DELETE FROM activity_points;
 DELETE FROM group_point_history;
 DELETE FROM point_history;
 DELETE FROM persons;
-DELETE FROM `groups`;
+DELETE FROM "groups";
 
 -- Insert groups
-INSERT INTO `groups` (id, name, total_group_points) VALUES ('group1', 'The Avengers', 0);
-INSERT INTO `groups` (id, name, total_group_points) VALUES ('group2', 'Justice League', 0);
-INSERT INTO `groups` (id, name, total_group_points) VALUES ('group3', 'Guardians of the Galaxy', 0);
-INSERT INTO `groups` (id, name, total_group_points) VALUES ('group4', 'X-Men', 0);
-INSERT INTO `groups` (id, name, total_group_points) VALUES ('group5', 'Fantastic Four', 0);
+INSERT INTO "groups" (id, name, total_group_points) VALUES ('group1', 'The Avengers', 0);
+INSERT INTO "groups" (id, name, total_group_points) VALUES ('group2', 'Justice League', 0);
+INSERT INTO "groups" (id, name, total_group_points) VALUES ('group3', 'Guardians of the Galaxy', 0);
+INSERT INTO "groups" (id, name, total_group_points) VALUES ('group4', 'X-Men', 0);
+INSERT INTO "groups" (id, name, total_group_points) VALUES ('group5', 'Fantastic Four', 0);
 
 -- Insert persons
 -- Group 1: The Avengers

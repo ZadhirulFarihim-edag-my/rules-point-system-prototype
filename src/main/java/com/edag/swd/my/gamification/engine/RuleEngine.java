@@ -74,7 +74,7 @@ public class RuleEngine {
             List<RuleConfig> ruleList = mapper.readValue(inputStream, new TypeReference<>() {
             });
             ruleList.forEach(rule -> this.rules.put(rule.getRuleName(), rule));
-            System.out.println("✅ Loaded " + ruleList.size() + " rules.");
+            System.out.println("Loaded " + ruleList.size() + " rules.");
         }
     }
 

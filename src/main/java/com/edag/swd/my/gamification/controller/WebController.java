@@ -1,11 +1,14 @@
 package com.edag.swd.my.gamification.controller;
 
+import com.edag.swd.my.gamification.config.ConditionConfig;
+import com.edag.swd.my.gamification.config.OutcomeConfig;
 import com.edag.swd.my.gamification.config.RuleConfig;
 import com.edag.swd.my.gamification.entity.Group;
 import com.edag.swd.my.gamification.entity.Person;
 import com.edag.swd.my.gamification.service.GroupService;
 import com.edag.swd.my.gamification.service.PersonService;
 import com.edag.swd.my.gamification.service.RuleService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -163,5 +166,104 @@ public class WebController {
         // Convert rule name to URL format
         String ruleUrl = ruleName.replace(" ", "-").toLowerCase();
         return "redirect:/rules/" + ruleUrl;
+    }
+
+    /**
+     * Displays the rule creation form.
+     *
+     * @param model The model to add attributes to
+     * @return The name of the view to render
+     */
+    @GetMapping("/rules/create")
+    public String createRuleForm(Model model) {
+        return "rules/create-rule";
+    }
+
+    /**
+     * Processes the rule creation form submission.
+     *
+     * @param ruleJson           The JSON representation of the rule
+     * @param redirectAttributes Attributes to add to the redirect
+     * @return The name of the view to render
+     */
+    @PostMapping("/rules/save")
+    public String saveRule(@RequestParam String ruleJson, RedirectAttributes redirectAttributes) {
+        try {
+            // Parse the rule JSON
+            ObjectMapper mapper = new ObjectMapper();
+            RuleConfig rule = mapper.readValue(ruleJson, RuleConfig.class);
+
+            // Validate the rule
+            if (!validateRule(rule)) {
+                redirectAttributes.addFlashAttribute("error", "Invalid rule configuration");
+                return "redirect:/rules/create";
+            }
+
+            // Add the rule
+            boolean added = ruleService.addRule(rule);
+
+            if (added) {
+                redirectAttributes.addFlashAttribute("success", "Rule '" + rule.getRuleName() + "' created successfully");
+                return "redirect:/rules";
+            } else {
+                redirectAttributes.addFlashAttribute("error", "A rule with the name '" + rule.getRuleName() + "' already exists");
+                return "redirect:/rules/create";
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Error creating rule: " + e.getMessage());
+            return "redirect:/rules/create";
+        }
+    }
+
+    /**
+     * Validates a rule configuration.
+     *
+     * @param rule The rule to validate
+     * @return true if the rule is valid, false otherwise
+     */
+    private boolean validateRule(RuleConfig rule) {
+        // Check if rule name is provided
+        if (rule.getRuleName() == null || rule.getRuleName().trim().isEmpty()) {
+            return false;
+        }
+
+        // Check if description is provided
+        if (rule.getDescription() == null || rule.getDescription().trim().isEmpty()) {
+            return false;
+        }
+
+        // Check if at least one condition is provided
+        if (rule.getConditions() == null || rule.getConditions().isEmpty()) {
+            return false;
+        }
+
+        // Check if all conditions have a type and value
+        for (ConditionConfig condition : rule.getConditions()) {
+            if (condition.getType() == null || condition.getType().trim().isEmpty() ||
+                    condition.getValue() == null || condition.getValue().trim().isEmpty()) {
+                return false;
+            }
+        }
+
+        // Check if at least one outcome is provided
+        if (rule.getOutcomes() == null || rule.getOutcomes().isEmpty()) {
+            return false;
+        }
+
+        // Check if all outcomes have a type, points, target, and reason
+        for (OutcomeConfig outcome : rule.getOutcomes()) {
+            if (outcome.getType() == null || outcome.getType().trim().isEmpty() ||
+                    outcome.getTarget() == null || outcome.getTarget().trim().isEmpty() ||
+                    outcome.getReason() == null || outcome.getReason().trim().isEmpty()) {
+                return false;
+            }
+        }
+
+        // Check if cap is valid
+        if (rule.getCap() != null && rule.getCap().getMaxPoints() <= 0) {
+            return false;
+        }
+
+        return true;
     }
 }
